@@ -15,11 +15,11 @@
 
 static const char * const command_name = "lvseem";
 
-typedef struct {
+struct lvseem_option {
     const char *device_name;
-} option;
+};
 
-bool option_parse( const int argc, const char * const argv[], option * const option ) {
+bool option_parse( const int argc, const char * const argv[], struct lvseem_option * const option ) {
     if ( ! option ) {
         return false;
     }
@@ -29,7 +29,7 @@ bool option_parse( const int argc, const char * const argv[], option * const opt
     return true;
 }
 
-bool option_validate( const option * const option ) {
+bool option_validate( const struct lvseem_option * const option ) {
     if ( ! option ) {
         return false;
     }
@@ -45,7 +45,7 @@ void usage( void )
 }
 
 int main(int argc, const char * argv[]) {
-    option option = {};
+    struct lvseem_option option = {};
     if ( ! option_parse( argc, argv, &option ) ) {
         usage();
         return EXIT_FAILURE;
@@ -65,6 +65,6 @@ int main(int argc, const char * argv[]) {
         fprintf( stderr, "error: close: %s\n", strerror( errno ) );
         return EXIT_FAILURE;
     }
-    
+
     return EXIT_SUCCESS;
 }

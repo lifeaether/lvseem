@@ -131,13 +131,27 @@ int main(int argc, const char * argv[]) {
         return EXIT_FAILURE;
     }
 
+    if ( option.b_id ) {
+        if ( ! bp35a1_set_b_id( serial_port, stdout, option.b_id ) ) {
+            close( serial_port );
+            return EXIT_FAILURE;
+        }
+    }
+
+    if ( option.b_password ) {
+        if ( ! bp35a1_set_b_password( serial_port, stdout, option.b_password ) ) {
+            close( serial_port );
+            return EXIT_FAILURE;
+        }
+    }
+
     if ( strcmp( option.command, "read" ) == 0 ) {
-        bp35a1_print_read_to_end( serial_port, stdout );
+        bp35a1_read_to_end( serial_port, stdout );
     } else if ( strcmp( option.command, "status" ) == 0 ) {
-        bp35a1_print_status( serial_port, stdout );
+        bp35a1_status( serial_port, stdout );
         return EXIT_SUCCESS;
     } else if ( strcmp( option.command, "activescan" ) == 0 ) {
-        bp35a1_print_activescan( serial_port, stdout, option.b_id, option.b_password );
+        bp35a1_activescan( serial_port, stdout );
     } else {
         fprintf( stderr, "no command found\n" );
     }

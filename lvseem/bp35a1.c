@@ -13,6 +13,8 @@
 #include <string.h>
 #include <unistd.h>
 
+static uint8_t bp35a1_sksreg_sfe = 1;
+
 ssize_t bp35a1_write_bytes( const int fd, const uint8_t * const bytes, const size_t size )
 {
     size_t write_size = 0;
@@ -60,7 +62,32 @@ bool bp35a1_read_string( const int fd, char * const string, const size_t size )
     return true;
 }
 
-void bp35a1_print_read_to_end( const int fd, FILE *fp )
+ssize_t pb35a1_read_line( const int fd, char * const string, const size_t size )
+{
+    size_t read_size = 0;
+    while ( read_size < size-1 ) {
+        const ssize_t n = read( fd, string + read_size, 1 );
+        if ( n == -1 ) {
+            fprintf( stderr, "read: %s\n", strerror( errno ) );
+            break;
+        }
+        read_size += n;
+        if ( n == 0 ) {
+            break;
+        }
+        if ( read_size > 2 ) {
+            if ( memcmp( string+read_size-2, "\r\n", 2 ) == 0 ) {
+                break;
+            }
+        }
+    }
+    if ( size > 0 ) {
+        string[read_size] = '\0';
+    }
+    return read_size;
+}
+
+bool bp35a1_read_to_end( const int fd, FILE *fp )
 {
     char response[128] = {};
     while ( true ) {
@@ -71,9 +98,10 @@ void bp35a1_print_read_to_end( const int fd, FILE *fp )
         fprintf( stdout, "%s", response );
     }
     fprintf( stdout, "\n" );
+    return true;
 }
 
-void bp35a1_print_status( const int fd, FILE *fp )
+bool bp35a1_status( const int fd, FILE *fp )
 {
     char response[128] = {};
 
@@ -101,34 +129,66 @@ void bp35a1_print_status( const int fd, FILE *fp )
         bp35a1_read_string( fd, response, sizeof(response) );
         fprintf( fp, "%s", response );
     }
+
+    return true;
 }
 
-void bp35a1_print_activescan( const int fd, FILE *fp, const char *b_id, const char *b_password )
+bool bp35a1_activescan( const int fd, FILE *fp )
 {
     char command[128] = {};
-    char response[256] = {};
-    {
-        snprintf( command, sizeof( command ), "SKSETPWD C %s\r\n", b_password );
-        bp35a1_write_string( fd, command );
-        bp35a1_read_string( fd, response, sizeof( response ) );
-        fprintf( fp, "%s", response );
-    }
-
-    {
-        snprintf( command, sizeof( command ), "SKSETRBID %s\r\n", b_id );
-        bp35a1_write_string( fd, command );
-        bp35a1_read_string( fd, response, sizeof( response ) );
-        fprintf( fp, "%s", response );
-    }
+    char response[128] = {};
 
     snprintf( command, sizeof( command ), "SKSCAN 2 FFFFFFFF 4\r\n" );
     bp35a1_write_string( fd, command );
-    bp35a1_read_string( fd, response, sizeof( response ) );
-    fprintf( fp, "%s", response );
-    for ( int i = 0; i < 6; ++i ) {
-        sleep( 1 );
-        bp35a1_read_string( fd, response, sizeof( response ) );
+    if ( bp35a1_sksreg_sfe ) {
+        pb35a1_read_line( fd, response, sizeof( response ) );
         fprintf( fp, "%s", response );
     }
-    fprintf( fp, "%s\n", response );
+    for ( int i = 0; i < 10; ++i ) {
+        pb35a1_read_line( fd, response, sizeof( response ) );
+        fprintf( fp, "%s", response );
+        const char event22[] = "EVENT 22";
+        if ( strncmp( response, event22, sizeof( event22 )-1 ) == 0 ) {
+            return true;
+        }
+        sleep( 1 );
+    }
+    return false;
 }
+
+bool bp35a1_set_b_id( const int fd, FILE *fp, const char *b_id )
+{
+    char command[64] = {};
+    char response[64] = {};
+    snprintf( command, sizeof( command ), "SKSETRBID %s\r\n", b_id );
+    bp35a1_write_string( fd, command );
+    if ( bp35a1_sksreg_sfe ) {
+        pb35a1_read_line( fd, response, sizeof( response ) );
+        fprintf( stdout, "%s", response );
+    }
+    pb35a1_read_line( fd, response, sizeof( response ) );
+    fprintf( stdout, "%s", response );
+    if ( strcmp( response, "OK\r\n" ) != 0 ) {
+        return false;
+    }
+    return true;
+}
+
+bool bp35a1_set_b_password( const int fd, FILE *fp, const char *b_password )
+{
+    char command[64] = {};
+    char response[64] = {};
+    snprintf( command, sizeof( command ), "SKSETPWD C %s\r\n", b_password );
+    bp35a1_write_string( fd, command );
+    if ( bp35a1_sksreg_sfe ) {
+        pb35a1_read_line( fd, response, sizeof( response ) );
+        fprintf( stdout, "%s", response );
+    }
+    pb35a1_read_line( fd, response, sizeof( response ) );
+    fprintf( stdout, "%s", response );
+    if ( strcmp( response, "OK\r\n" ) != 0 ) {
+        return false;
+    }
+    return true;
+}
+

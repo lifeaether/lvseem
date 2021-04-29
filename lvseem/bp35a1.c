@@ -71,9 +71,37 @@ bool bp35a1_command_read_ok( const int fd )
     return memcmp( resposne, ok, sizeof(ok) ) == 0;
 }
 
+bool bp35a1_skinfo( const int fd, char *info, size_t size )
+{
+    const char command[] = "SKINFO\r\n";
+    if ( ! bp35a1_command_write( fd, command ) ) {
+        return false;
+    }
+
+    if ( bp35a1_sksreg_sfe ) {
+        uint8_t response[sizeof(command)] = {};
+        size_t response_size = sizeof( response );
+        if ( ! bp35a1_command_read_line( fd, response, &response_size ) ) {
+            return false;
+        }
+        if ( memcmp( response, command, response_size ) != 0 ) {
+            return false;
+        }
+    }
+
+    {
+        if ( ! bp35a1_command_read_line( fd, (uint8_t *)info, &size ) ) {
+            return false;
+        }
+        info[size - sizeof( bp35a1_end_of_line )] = '\0';
+    }
+
+    return bp35a1_command_read_ok( fd );
+}
+
 bool bp35a1_skver( const int fd, char *version, size_t size )
 {
-    const char * const command = "SKVER\r\n";
+    const char command[] = "SKVER\r\n";
     if ( ! bp35a1_command_write( fd, command ) ) {
         return false;
     }

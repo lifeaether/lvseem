@@ -162,25 +162,8 @@ int main(int argc, const char * argv[]) {
         return EXIT_FAILURE;
     }
 
-    {
-        char version[32] = {};
-        if ( ! bp35a1_command( serial_port, "SKVER", version, sizeof(version) ) ) {
-            fprintf( stderr, "bp35a1_command: FAILED\n" );
-            lvseem_resource_close_all( resources, sizeof( resources ) / sizeof( resources[0] ) );
-            return EXIT_FAILURE;
-        }
-        fprintf( stdout, "%s\n", version );
-    }
-
-    {
-        char response[128] = {};
-        if ( ! bp35a1_command( serial_port, "SKINFO", response, sizeof(response) ) ) {
-            fprintf( stderr, "bp35a1_command: FAILED\n" );
-            lvseem_resource_close_all( resources, sizeof( resources ) / sizeof( resources[0] ) );
-            return EXIT_FAILURE;
-        }
-        fprintf( stdout, "%s\n", response );
-    }
+    bp35a1_read_to_end( serial_port );
+    bp35a1_print_information( serial_port, stdout );
 
     if ( ! lvseem_resource_close_all( resources, sizeof( resources ) / sizeof( resources[0] ) ) ) {
         return EXIT_FAILURE;

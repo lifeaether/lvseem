@@ -8,96 +8,91 @@
 #include "bp35a1.h"
 
 #include <errno.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 #include <unistd.h>
 
-static int bp35a1_sksreg_sfe = 1; // echo back.
-
-static const uint8_t bp35a1_end_of_line[] = { '\r', '\n' };
-
-bool bp35a1_command_write( const int fd, const char *input )
+ssize_t bp35a1_write_bytes( const int fd, const uint8_t * const bytes, const size_t size )
 {
-    const size_t input_length = strlen( input );
     size_t write_size = 0;
-    while ( write_size < input_length ) {
-        const ssize_t n = write( fd, input+write_size, input_length-write_size );
+    while ( write_size < size ) {
+        const ssize_t n = write( fd, bytes + write_size, size - write_size );
         if ( n == -1 ) {
             fprintf( stderr, "write: %s\n", strerror( errno ) );
-            return false;
+            break;
         }
         write_size += n;
     }
-    return true;
+    return write_size;
 }
 
-bool bp35a1_command_write_command( const int fd, const char *command )
+bool bp35a1_write_string( const int fd, const char * const string )
 {
-    if ( ! bp35a1_command_write( fd, command ) ) {
-        return false;
-    }
-    if ( ! bp35a1_command_write( fd, (const char *)bp35a1_end_of_line ) ) {
-        return false;
-    }
-    return true;
+    const size_t size = strlen( string );
+    return bp35a1_write_bytes( fd, (const uint8_t *)string, size ) == size;
 }
 
-bool bp35a1_command_read_line( const int fd, uint8_t * const response, size_t *size )
+ssize_t bp35a1_read_bytes( const int fd, uint8_t * const bytes, const size_t size )
 {
-    const size_t response_size = *size;
-    *size = 0;
-    while ( *size < response_size ) {
-        const ssize_t n = read( fd, response + *size, 1 );
+    size_t read_size = 0;
+    while ( read_size < size ) {
+        const ssize_t n = read( fd, bytes + read_size, size - read_size );
         if ( n == -1 ) {
             fprintf( stderr, "read: %s\n", strerror( errno ) );
-            return false;
-        } else if ( n == 0 ) {
-            return false;
+            break;
         }
-        *size += n;
-        if ( memcmp( response + *size - sizeof(bp35a1_end_of_line), bp35a1_end_of_line, sizeof(bp35a1_end_of_line) ) == 0 ) {
-            return true;
+        read_size += n;
+        if ( n == 0 ) {
+            break;
         }
     }
-    return false;
+    return read_size;
 }
 
-bool bp35a1_command_read_ok( const int fd )
+bool bp35a1_read_string( const int fd, char * const string, const size_t size )
 {
-    const uint8_t ok[] = { 'O', 'K', '\r', '\n' };
-    uint8_t resposne[sizeof(ok)] = {};
-    size_t resposne_size = sizeof( resposne_size );
-    if ( ! bp35a1_command_read_line( fd, resposne, &resposne_size ) ) {
+    const ssize_t n = bp35a1_read_bytes( fd, (uint8_t *)string, size-1 );
+    if ( n < 0 ) {
         return false;
     }
-    return memcmp( resposne, ok, sizeof(ok) ) == 0;
+    string[n] = '\0';
+    return true;
 }
 
-bool bp35a1_command( const int fd, const char *command, char *response, size_t size )
+void bp35a1_read_to_end( const int fd )
 {
-    if ( ! bp35a1_command_write_command( fd, command ) ) {
-        return false;
-    }
-
-    if ( bp35a1_sksreg_sfe ) {
-        const size_t command_size = strlen( command );
-        size_t response_size = command_size + sizeof( bp35a1_end_of_line );
-        uint8_t *response = malloc( response_size );
-        if ( ! bp35a1_command_read_line( fd, response, &response_size ) ) {
-            return false;
-        }
-        if ( memcmp( response, command, command_size ) != 0 ) {
-            return false;
+    uint8_t buffer[64];
+    while ( true ) {
+        const ssize_t n = read( fd, buffer, sizeof( buffer ) );
+        if ( n <= 0 ) {
+            break;
         }
     }
+}
 
-    {
-        if ( ! bp35a1_command_read_line( fd, (uint8_t *)response, &size ) ) {
-            return false;
-        }
-        response[size - sizeof( bp35a1_end_of_line )] = '\0';
+void bp35a1_print_information( const int fd, FILE *fp )
+{
+    char response[128] = {};
+
+    bp35a1_write_string( fd, "SKVER\r\n" );
+    bp35a1_read_string( fd, response, sizeof(response) );
+    fprintf( fp, "%s", response );
+
+    bp35a1_write_string( fd, "SKINFO\r\n" );
+    bp35a1_read_string( fd, response, sizeof(response) );
+    fprintf( fp, "%s", response );
+
+    const char *sksreg_names[] = {
+        "S02", "S03", "S07", "S0A", "S15", "S16", "S17", "SA0", "SA1", "SFB", "SFD", "SFE", "SFF"
+    };
+    size_t sksreg_names_count = sizeof( sksreg_names ) / sizeof( sksreg_names[0] );
+
+    for ( size_t i = 0; i < sksreg_names_count; ++i ) {
+        char command[16] = {};
+        sprintf( command, "SKSREG %s\r\n", sksreg_names[i] );
+        bp35a1_write_string( fd, command );
+        bp35a1_read_string( fd, response, sizeof(response) );
+        fprintf( fp, "%s", response );
     }
-
-    return bp35a1_command_read_ok( fd );
 }

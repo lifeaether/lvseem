@@ -149,7 +149,6 @@ int main(int argc, const char * argv[]) {
         bp35a1_read_to_end( serial_port, stdout );
     } else if ( strcmp( option.command, "status" ) == 0 ) {
         bp35a1_status( serial_port, stdout );
-        return EXIT_SUCCESS;
     } else if ( strcmp( option.command, "activescan" ) == 0 ) {
         bp35a1_activescan( serial_port, stdout );
     } else {

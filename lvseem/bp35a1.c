@@ -58,17 +58,21 @@ bool bp35a1_read_string( const int fd, char * const string, const size_t size )
     if ( n < 0 ) {
         return false;
     }
-    string[n] = '\0';
+    if ( size > 0 ) {
+        string[n] = '\0';
+    }
     return true;
 }
 
-ssize_t pb35a1_read_line( const int fd, char * const string, const size_t size )
+bool pb35a1_read_line( const int fd, char * const string, const size_t size )
 {
+    bool result = true;
     size_t read_size = 0;
     while ( read_size < size-1 ) {
         const ssize_t n = read( fd, string + read_size, 1 );
         if ( n == -1 ) {
             fprintf( stderr, "read: %s\n", strerror( errno ) );
+            result = false;
             break;
         }
         read_size += n;
@@ -84,7 +88,7 @@ ssize_t pb35a1_read_line( const int fd, char * const string, const size_t size )
     if ( size > 0 ) {
         string[read_size] = '\0';
     }
-    return read_size;
+    return result;
 }
 
 bool bp35a1_read_to_end( const int fd, FILE *fp )
@@ -148,8 +152,22 @@ bool bp35a1_activescan( const int fd, FILE *fp )
         pb35a1_read_line( fd, response, sizeof( response ) );
         fprintf( fp, "%s", response );
         const char event22[] = "EVENT 22";
+        const char epandesc[] = "EPANDESC\r\n";
         if ( strncmp( response, event22, sizeof( event22 )-1 ) == 0 ) {
             return true;
+        } else if ( strcmp( response, epandesc ) == 0 ) {
+            pb35a1_read_line( fd, response, sizeof( response ) );
+            fprintf( fp, "%s", response );  // Channel
+            pb35a1_read_line( fd, response, sizeof( response ) );
+            fprintf( fp, "%s", response );  // Channel Page
+            pb35a1_read_line( fd, response, sizeof( response ) );
+            fprintf( fp, "%s", response );  // Pan ID
+            pb35a1_read_line( fd, response, sizeof( response ) );
+            fprintf( fp, "%s", response );  // Addr
+            pb35a1_read_line( fd, response, sizeof( response ) );
+            fprintf( fp, "%s", response );  // LQI
+            pb35a1_read_line( fd, response, sizeof( response ) );
+            fprintf( fp, "%s", response );  // PairID
         }
         sleep( 1 );
     }

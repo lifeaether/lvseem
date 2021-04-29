@@ -17,7 +17,7 @@ bool bp35a1_write_string( const int fd, const char * const string );
 
 ssize_t bp35a1_read_bytes( const int fd, uint8_t * const bytes, const size_t size );
 bool bp35a1_read_string( const int fd, char * const string, const size_t size );
-ssize_t pb35a1_read_line( const int fd, char * const string, const size_t size );
+bool pb35a1_read_line( const int fd, char * const string, const size_t size );
 
 bool bp35a1_read_to_end( const int fd, FILE *fp );
 bool bp35a1_status( const int fd, FILE *fp );

@@ -10,20 +10,12 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 static int bp35a1_sksreg_sfe = 1; // echo back.
 
 static const uint8_t bp35a1_end_of_line[] = { '\r', '\n' };
-
-static size_t min_size( const size_t x, const size_t y )
-{
-    if ( x < y ) {
-        return x;
-    } else {
-        return y;
-    }
-}
 
 bool bp35a1_command_write( const int fd, const char *input )
 {
@@ -36,6 +28,17 @@ bool bp35a1_command_write( const int fd, const char *input )
             return false;
         }
         write_size += n;
+    }
+    return true;
+}
+
+bool bp35a1_command_write_command( const int fd, const char *command )
+{
+    if ( ! bp35a1_command_write( fd, command ) ) {
+        return false;
+    }
+    if ( ! bp35a1_command_write( fd, (const char *)bp35a1_end_of_line ) ) {
+        return false;
     }
     return true;
 }
@@ -71,62 +74,29 @@ bool bp35a1_command_read_ok( const int fd )
     return memcmp( resposne, ok, sizeof(ok) ) == 0;
 }
 
-bool bp35a1_skinfo( const int fd, char *info, size_t size )
+bool bp35a1_command( const int fd, const char *command, char *response, size_t size )
 {
-    const char command[] = "SKINFO\r\n";
-    if ( ! bp35a1_command_write( fd, command ) ) {
+    if ( ! bp35a1_command_write_command( fd, command ) ) {
         return false;
     }
 
     if ( bp35a1_sksreg_sfe ) {
-        uint8_t response[sizeof(command)] = {};
-        size_t response_size = sizeof( response );
+        const size_t command_size = strlen( command );
+        size_t response_size = command_size + sizeof( bp35a1_end_of_line );
+        uint8_t *response = malloc( response_size );
         if ( ! bp35a1_command_read_line( fd, response, &response_size ) ) {
             return false;
         }
-        if ( memcmp( response, command, response_size ) != 0 ) {
+        if ( memcmp( response, command, command_size ) != 0 ) {
             return false;
         }
     }
 
     {
-        if ( ! bp35a1_command_read_line( fd, (uint8_t *)info, &size ) ) {
+        if ( ! bp35a1_command_read_line( fd, (uint8_t *)response, &size ) ) {
             return false;
         }
-        info[size - sizeof( bp35a1_end_of_line )] = '\0';
-    }
-
-    return bp35a1_command_read_ok( fd );
-}
-
-bool bp35a1_skver( const int fd, char *version, size_t size )
-{
-    const char command[] = "SKVER\r\n";
-    if ( ! bp35a1_command_write( fd, command ) ) {
-        return false;
-    }
-
-    if ( bp35a1_sksreg_sfe ) {
-        uint8_t response[sizeof(command)] = {};
-        size_t response_size = sizeof( response );
-        if ( ! bp35a1_command_read_line( fd, response, &response_size ) ) {
-            return false;
-        }
-        if ( memcmp( response, command, response_size ) != 0 ) {
-            return false;
-        }
-    }
-
-    {
-        uint8_t resposne[32] = {};
-        size_t resposne_size = sizeof( resposne );
-        if ( ! bp35a1_command_read_line( fd, resposne, &resposne_size ) ) {
-            return false;
-        }
-
-        const size_t copy_size = min_size( size-1, resposne_size - sizeof( bp35a1_end_of_line ) );
-        memcpy( version, resposne, copy_size );
-        version[copy_size] = '\0';
+        response[size - sizeof( bp35a1_end_of_line )] = '\0';
     }
 
     return bp35a1_command_read_ok( fd );

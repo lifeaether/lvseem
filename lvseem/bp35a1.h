@@ -14,9 +14,8 @@
 //bool bp35a1_set_echo_back( const int fd, bool enabled );
 
 bool bp35a1_command_write( const int fd, const char *input );
+bool bp35a1_command_write_command( const int fd, const char *command );
 bool bp35a1_command_read_line( const int fd, uint8_t * const response, size_t *size );
-
-bool bp35a1_skinfo( const int fd, char *info, size_t size );
-bool bp35a1_skver( const int fd, char *version, size_t size );
+bool bp35a1_command( const int fd, const char *command, char *response, size_t size );
 
 #endif /* bp35a1_h */

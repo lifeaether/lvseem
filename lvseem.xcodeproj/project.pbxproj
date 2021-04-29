@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		CE7B71C1263A76C1007E1890 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = CE7B71C0263A76C1007E1890 /* main.c */; };
+		CE7B71C9263A8DE5007E1890 /* bp35a1.c in Sources */ = {isa = PBXBuildFile; fileRef = CE7B71C8263A8DE5007E1890 /* bp35a1.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -25,6 +26,8 @@
 /* Begin PBXFileReference section */
 		CE7B71BD263A76C1007E1890 /* lvseem */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = lvseem; sourceTree = BUILT_PRODUCTS_DIR; };
 		CE7B71C0263A76C1007E1890 /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
+		CE7B71C7263A8DE5007E1890 /* bp35a1.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bp35a1.h; sourceTree = "<group>"; };
+		CE7B71C8263A8DE5007E1890 /* bp35a1.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = bp35a1.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -58,6 +61,8 @@
 			isa = PBXGroup;
 			children = (
 				CE7B71C0263A76C1007E1890 /* main.c */,
+				CE7B71C7263A8DE5007E1890 /* bp35a1.h */,
+				CE7B71C8263A8DE5007E1890 /* bp35a1.c */,
 			);
 			path = lvseem;
 			sourceTree = "<group>";
@@ -119,6 +124,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CE7B71C1263A76C1007E1890 /* main.c in Sources */,
+				CE7B71C9263A8DE5007E1890 /* bp35a1.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

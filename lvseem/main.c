@@ -14,6 +14,8 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include "bp35a1.h"
+
 static const char * const lvseem_command_name = "lvseem";
 
 struct lvseem_option {
@@ -159,6 +161,15 @@ int main(int argc, const char * argv[]) {
         lvseem_resource_close_all( resources, sizeof( resources ) / sizeof( resources[0] ) );
         return EXIT_FAILURE;
     }
+
+    char version[32] = {};
+    if ( ! bp35a1_skver( serial_port, version, sizeof(version) ) ) {
+        fprintf( stderr, "bp35a1_skver: FAILED\n" );
+        lvseem_resource_close_all( resources, sizeof( resources ) / sizeof( resources[0] ) );
+        return EXIT_FAILURE;
+    }
+
+    fprintf( stdout, "%s\n", version );
 
     if ( ! lvseem_resource_close_all( resources, sizeof( resources ) / sizeof( resources[0] ) ) ) {
         return EXIT_FAILURE;

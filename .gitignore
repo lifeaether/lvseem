@@ -1,3 +1,4 @@
 *.xcworkspace
 xcshareddata
 xcuserdata
+.DS_Store

@@ -79,6 +79,10 @@ void bp35a1_print_information( const int fd, FILE *fp )
     bp35a1_read_string( fd, response, sizeof(response) );
     fprintf( fp, "%s", response );
 
+    bp35a1_write_string( fd, "SKAPPVER\r\n" );
+    bp35a1_read_string( fd, response, sizeof(response) );
+    fprintf( fp, "%s", response );
+
     bp35a1_write_string( fd, "SKINFO\r\n" );
     bp35a1_read_string( fd, response, sizeof(response) );
     fprintf( fp, "%s", response );

@@ -14,6 +14,7 @@
 
 ssize_t bp35a1_write_bytes( const int fd, const uint8_t * const bytes, const size_t size );
 bool bp35a1_write_string( const int fd, const char * const string );
+
 ssize_t bp35a1_read_bytes( const int fd, uint8_t * const bytes, const size_t size );
 bool bp35a1_read_string( const int fd, char * const string, const size_t size );
 

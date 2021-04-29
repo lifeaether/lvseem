@@ -18,8 +18,8 @@ bool bp35a1_write_string( const int fd, const char * const string );
 ssize_t bp35a1_read_bytes( const int fd, uint8_t * const bytes, const size_t size );
 bool bp35a1_read_string( const int fd, char * const string, const size_t size );
 
-void bp35a1_read_to_end( const int fd );
-
-void bp35a1_print_information( const int fd, FILE *fp );
+void bp35a1_print_read_to_end( const int fd, FILE *fp );
+void bp35a1_print_status( const int fd, FILE *fp );
+void bp35a1_print_activescan( const int fd, FILE *fp, const char *b_id, const char *b_password );
 
 #endif /* bp35a1_h */

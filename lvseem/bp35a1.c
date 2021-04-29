@@ -60,18 +60,20 @@ bool bp35a1_read_string( const int fd, char * const string, const size_t size )
     return true;
 }
 
-void bp35a1_read_to_end( const int fd )
+void bp35a1_print_read_to_end( const int fd, FILE *fp )
 {
-    uint8_t buffer[64];
+    char response[128] = {};
     while ( true ) {
-        const ssize_t n = read( fd, buffer, sizeof( buffer ) );
-        if ( n <= 0 ) {
+        bp35a1_read_string( fd, response, sizeof( response ) );
+        if ( strlen( response ) == 0 ) {
             break;
         }
+        fprintf( stdout, "%s", response );
     }
+    fprintf( stdout, "\n" );
 }
 
-void bp35a1_print_information( const int fd, FILE *fp )
+void bp35a1_print_status( const int fd, FILE *fp )
 {
     char response[128] = {};
 
@@ -99,4 +101,34 @@ void bp35a1_print_information( const int fd, FILE *fp )
         bp35a1_read_string( fd, response, sizeof(response) );
         fprintf( fp, "%s", response );
     }
+}
+
+void bp35a1_print_activescan( const int fd, FILE *fp, const char *b_id, const char *b_password )
+{
+    char command[128] = {};
+    char response[256] = {};
+    {
+        snprintf( command, sizeof( command ), "SKSETPWD C %s\r\n", b_password );
+        bp35a1_write_string( fd, command );
+        bp35a1_read_string( fd, response, sizeof( response ) );
+        fprintf( fp, "%s", response );
+    }
+
+    {
+        snprintf( command, sizeof( command ), "SKSETRBID %s\r\n", b_id );
+        bp35a1_write_string( fd, command );
+        bp35a1_read_string( fd, response, sizeof( response ) );
+        fprintf( fp, "%s", response );
+    }
+
+    snprintf( command, sizeof( command ), "SKSCAN 2 FFFFFFFF 4\r\n" );
+    bp35a1_write_string( fd, command );
+    bp35a1_read_string( fd, response, sizeof( response ) );
+    fprintf( fp, "%s", response );
+    for ( int i = 0; i < 6; ++i ) {
+        sleep( 1 );
+        bp35a1_read_string( fd, response, sizeof( response ) );
+        fprintf( fp, "%s", response );
+    }
+    fprintf( fp, "%s\n", response );
 }

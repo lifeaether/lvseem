@@ -19,7 +19,10 @@
 static const char * const lvseem_command_name = "lvseem";
 
 struct lvseem_option {
+    const char *command;
     const char *device_name;
+    const char *b_id;
+    const char *b_password;
 };
 
 bool lvseem_option_parse( const int argc, const char * const argv[], struct lvseem_option * const option ) {
@@ -27,7 +30,15 @@ bool lvseem_option_parse( const int argc, const char * const argv[], struct lvse
         return false;
     }
     for ( int i = 1; i < argc; ++i ) {
-        option->device_name = argv[i];
+        if ( strcmp( argv[i], "--device" ) == 0 && ++i < argc ) {
+            option->device_name = argv[i];
+        } else if ( strcmp( argv[i], "--id" ) == 0 && ++i < argc ) {
+            option->b_id = argv[i];
+        } else if ( strcmp( argv[i], "--password" ) == 0 && ++i < argc ) {
+            option->b_password = argv[i];
+        } else {
+            option->command = argv[i];
+        }
     }
     return true;
 }
@@ -36,57 +47,7 @@ bool lvseem_option_validate( const struct lvseem_option * const option ) {
     if ( ! option ) {
         return false;
     }
-    if ( ! option->device_name ) {
-        return false;
-    }
-    return true;
-}
-
-void lvseem_usage( void )
-{
-    fprintf( stderr, "usage: %s DeviceName\n", lvseem_command_name );
-}
-
-struct lvseem_resource {
-    bool (*close)( void *item );
-    void *item;
-};
-
-bool lvseem_resource_close( const struct lvseem_resource * const resource )
-{
-    if ( ! resource ) {
-        return true;
-    }
-    if ( ! resource->item ) {
-        return true;
-    }
-    if ( ! resource->close ) {
-        return false;
-    }
-    return resource->close( resource->item );
-}
-
-bool lvseem_resource_close_all( const struct lvseem_resource * const resources, const int count )
-{
-    bool failed = false;
-    for ( int i = 0; i < count; ++i ) {
-        const bool result = lvseem_resource_close( &(resources[i]) );
-        failed = failed || (! result);
-    }
-    return ! failed;
-}
-
-bool serial_port_close( void *item )
-{
-    int *serial_port = (int *)item;
-    if ( ! serial_port ) {
-        return true;
-    }
-    if ( *serial_port == -1 ) {
-        return true;
-    }
-    if ( close( *serial_port ) != 0 ) {
-        fprintf( stderr, "close: %s\n", strerror( errno ) );
+    if ( ! option->command ) {
         return false;
     }
     return true;
@@ -120,7 +81,7 @@ bool serial_port_initalize( const int serial_port )
     // tty.c_oflag &= ~OXTABS; // Prevent conversion of tabs to spaces (NOT PRESENT ON LINUX)
     // tty.c_oflag &= ~ONOEOT; // Prevent removal of C-d chars (0x004) in output (NOT PRESENT ON LINUX)
 
-    tty.c_cc[VTIME] = 10;    // Wait for up to 1s (10 deciseconds), returning as soon as any data is received.
+    tty.c_cc[VTIME] = 1;    // Wait for up to 1s (10 deciseconds), returning as soon as any data is received.
     tty.c_cc[VMIN] = 0;
 
     // Set in/out baud rate to be 115200
@@ -134,6 +95,15 @@ bool serial_port_initalize( const int serial_port )
     return true;
 }
 
+void lvseem_usage( void )
+{
+    fprintf( stderr, "usage: %s command ", lvseem_command_name );
+    fprintf( stderr, "[--device DeviceName]" );
+    fprintf( stderr, "[--id ID for Route-B]" );
+    fprintf( stderr, "[--password for Route-B]" );
+    fprintf( stderr, "\n" );
+}
+
 int main(int argc, const char * argv[]) {
     struct lvseem_option option = {};
     if ( ! lvseem_option_parse( argc, argv, &option ) ) {
@@ -145,27 +115,34 @@ int main(int argc, const char * argv[]) {
         return EXIT_FAILURE;
     }
 
-    int serial_port = -1;
-    struct lvseem_resource resources[] = {
-        { serial_port_close, &serial_port },
-    };
-    
-    serial_port = open( option.device_name, O_RDWR );
+    if ( strcmp( option.command, "help" ) == 0 ) {
+        lvseem_usage();
+        return EXIT_SUCCESS;
+    }
+
+    const int serial_port = open( option.device_name, O_RDWR );
     if ( serial_port == -1 ) {
-        lvseem_resource_close_all( resources, sizeof( resources ) / sizeof( resources[0] ) );
         fprintf( stderr, "open: %s\n", strerror( errno ) );
         return EXIT_FAILURE;
     }
 
     if ( ! serial_port_initalize( serial_port ) ) {
-        lvseem_resource_close_all( resources, sizeof( resources ) / sizeof( resources[0] ) );
+        close( serial_port );
         return EXIT_FAILURE;
     }
 
-    bp35a1_read_to_end( serial_port );
-    bp35a1_print_information( serial_port, stdout );
+    if ( strcmp( option.command, "read" ) == 0 ) {
+        bp35a1_print_read_to_end( serial_port, stdout );
+    } else if ( strcmp( option.command, "status" ) == 0 ) {
+        bp35a1_print_status( serial_port, stdout );
+        return EXIT_SUCCESS;
+    } else if ( strcmp( option.command, "activescan" ) == 0 ) {
+        bp35a1_print_activescan( serial_port, stdout, option.b_id, option.b_password );
+    } else {
+        fprintf( stderr, "no command found\n" );
+    }
 
-    if ( ! lvseem_resource_close_all( resources, sizeof( resources ) / sizeof( resources[0] ) ) ) {
+    if ( close( serial_port ) != 0 ) {
         return EXIT_FAILURE;
     }
 

@@ -24,5 +24,6 @@ bool bp35a1_status( const int fd, FILE *fp );
 bool bp35a1_activescan( const int fd, FILE *fp );
 bool bp35a1_set_b_id( const int fd, FILE *fp, const char *b_id );
 bool bp35a1_set_b_password( const int fd, FILE *fp, const char *b_password );
+bool bp35a1_pana_connect( const int fd, FILE *fp, const char *channel, const char *pan_id, const char *addr );
 
 #endif /* bp35a1_h */

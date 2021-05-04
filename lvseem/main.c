@@ -23,6 +23,9 @@ struct lvseem_option {
     const char *device_name;
     const char *b_id;
     const char *b_password;
+    const char *channel;
+    const char *pan_id;
+    const char *addr;
 };
 
 bool lvseem_option_parse( const int argc, const char * const argv[], struct lvseem_option * const option ) {
@@ -97,11 +100,11 @@ bool serial_port_initalize( const int serial_port )
 
 void lvseem_usage( void )
 {
-    fprintf( stderr, "usage: %s command ", lvseem_command_name );
-    fprintf( stderr, "[--device DeviceName]" );
-    fprintf( stderr, "[--id ID for Route-B]" );
-    fprintf( stderr, "[--password for Route-B]" );
-    fprintf( stderr, "\n" );
+    fprintf( stderr, "usage: %s command [options]\n", lvseem_command_name );
+    fprintf( stderr, "\t%s read --device DeviceName\n", lvseem_command_name );
+    fprintf( stderr, "\t%s status --device DeviceName\n", lvseem_command_name );
+    fprintf( stderr, "\t%s activescan --device DeviceName [--id Route-B_ID] [--password Route-B_Password]\n", lvseem_command_name );
+    fprintf( stderr, "\t%s help\n", lvseem_command_name );
 }
 
 int main(int argc, const char * argv[]) {

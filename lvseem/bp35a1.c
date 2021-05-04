@@ -210,3 +210,7 @@ bool bp35a1_set_b_password( const int fd, FILE *fp, const char *b_password )
     return true;
 }
 
+bool bp35a1_pana_connect( const int fd, FILE *fp, const char *channel, const char *pan_id, const char *addr )
+{
+    return false;
+}

@@ -145,6 +145,58 @@ static bool parse_einfo( const int fd, const struct bp35a1_handler * const handl
     return true;
 }
 
+static bool parse_skscan( const int fd, const struct bp35a1_handler * const handler, void *userdata )
+{
+    char string[64] = {};
+    if ( ! read_string_to( fd, string, sizeof( string ), "\r\n" ) ) {
+        return false;
+    }
+    if ( ! read_string( fd, "OK\r\n" ) ) {
+        return false;
+    }
+    return true;
+}
+
+static bool parse_event_1f( const int fd, const struct bp35a1_handler * const handler, void *userdata )
+{
+    if ( ! read_string( fd, " " ) ) {
+        return false;
+    }
+
+    char sender[64] = {};
+    if ( ! read_string_to( fd, sender, sizeof( sender ), "\r\n" ) ) {
+        return false;
+    }
+
+    if ( handler->event_1f ) {
+        if ( ! handler->event_1f( userdata, sender ) ) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static bool parse_eedscan( const int fd, const struct bp35a1_handler * const handler, void *userdata )
+{
+    if ( ! read_string( fd, "\r\n" ) ) {
+        return false;
+    }
+    
+    char string[256] = {};
+    if ( ! read_string_to( fd, string, sizeof( string ), "\r\n" ) ) {
+        return false;
+    }
+
+    if ( handler->event_eedscan ) {
+        if ( ! handler->event_eedscan( userdata, string ) ) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool bp35a1_command( const int fd, const char *string )
 {
     return bp35a1_write( fd, string, strlen( string )-1 );
@@ -152,7 +204,7 @@ bool bp35a1_command( const int fd, const char *string )
 
 bool bp35a1_response( const int fd, const struct bp35a1_handler * const handler, void *userdata )
 {
-    char buffer[8] = {};
+    char buffer[12] = {};
     const size_t buffer_size = sizeof( buffer );
     for ( size_t i = 0; i < buffer_size; i++ ) {
         const ssize_t n = read( fd, buffer+i, 1 );
@@ -168,7 +220,10 @@ bool bp35a1_response( const int fd, const struct bp35a1_handler * const handler,
             { "SKVER", parse_skver },
             { "EVER", parse_ever },
             { "SKINFO", parse_skinfo },
-            { "EINFO", parse_einfo }
+            { "EINFO", parse_einfo },
+            { "SKSCAN", parse_skscan },
+            { "EVENT 1F", parse_event_1f },
+            { "EEDSCAN", parse_eedscan },
         };
         static const size_t command_size = sizeof( commands ) / sizeof( commands[0] );
         for ( size_t i = 0; i < command_size; i++ ) {

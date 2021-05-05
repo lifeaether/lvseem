@@ -118,6 +118,7 @@ void lvseem_usage( void )
     fprintf( stderr, "usage: %s command [--clear][options]\n", lvseem_command_name );
     fprintf( stderr, "\t%s version --device DeviceName\n", lvseem_command_name );
     fprintf( stderr, "\t%s info --device DeviceName\n", lvseem_command_name );
+    fprintf( stderr, "\t%s scan --device DeviceName\n", lvseem_command_name );
     fprintf( stderr, "\t%s help\n", lvseem_command_name );
 }
 
@@ -134,6 +135,19 @@ static bool handler_event_einfo( void * const userdata, const char * const ipadd
     fprintf( stdout, "channel: %s\n", channel );
     fprintf( stdout, "panid: %s\n", panid );
     fprintf( stdout, "addr16: %s\n", addr16 );
+    return true;
+}
+
+static bool handler_event_1f( void * const userdata, const char * const sender )
+{
+    fprintf( stdout, "EVENT 1F: %s\n", sender );
+    return true;
+}
+
+static bool handler_event_eedscan( void * const userdata, const char * const channel_rssi )
+{
+    fprintf( stdout, "EDSCAN: %s\n", channel_rssi );
+    (*(bool *)userdata) = true;
     return true;
 }
 
@@ -188,23 +202,39 @@ int main(int argc, const char * argv[]) {
 //        }
     }
 
+    struct bp35a1_handler handler = {};
+    handler.event_ever = handler_event_ever;
+    handler.event_einfo = handler_event_einfo;
+    handler.event_1f = handler_event_1f;
+    handler.event_eedscan = handler_event_eedscan;
+
     bool result = EXIT_SUCCESS;
     if ( strcmp( option.command, "version" ) == 0 ) {
         if ( ! bp35a1_command( serial_port, "SKVER\r\n" ) ) {
             fprintf( stderr, "bp35a1_write: failed\n" );
             result = EXIT_FAILURE;
         }
+        while ( bp35a1_response( serial_port, &handler, NULL ) );
     } else if ( strcmp( option.command, "info" ) == 0 ) {
         if ( ! bp35a1_command( serial_port, "SKINFO\r\n" ) ) {
             fprintf( stderr, "bp35a1_write: failed\n" );
             result = EXIT_FAILURE;
         }
+        while ( bp35a1_response( serial_port, &handler, NULL ) );
+    } else if ( strcmp( option.command, "scan" ) == 0 ) {
+        if ( ! bp35a1_command( serial_port, "SKSCAN 0 FFFFFFFF 4\r\n" ) ) {
+            fprintf( stderr, "bp35a1_write: failed\n" );
+            result = EXIT_FAILURE;
+        }
+        bool completion = false;
+        for ( int i = 0; i < 10; i++ ) {
+            while ( bp35a1_response( serial_port, &handler, &completion ) );
+            if ( completion ) {
+                break;
+            }
+            sleep( 1 );
+        }
     }
-
-    struct bp35a1_handler handler = {};
-    handler.event_ever = handler_event_ever;
-    handler.event_einfo = handler_event_einfo;
-    while ( bp35a1_response( serial_port, &handler, NULL ) );
 
     if ( close( serial_port ) != 0 ) {
         fprintf( stderr, "close: failed\n" );

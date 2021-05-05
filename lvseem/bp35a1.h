@@ -14,6 +14,8 @@
 struct bp35a1_handler {
     bool (*event_ever)( void * const userdata, const char * const version );
     bool (*event_einfo)( void * const userdata, const char * const ipaddr, const char * const addr64, const char * const channel, const char * const panid, const char * const addr16 );
+    bool (*event_1f)( void * const userdata, const char * const sender );
+    bool (*event_eedscan)( void * const userdata, const char * const channel_rssi );
 };
 
 bool bp35a1_command( const int fd, const char *string );

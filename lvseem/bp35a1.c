@@ -161,21 +161,19 @@ bool bp35a1_response( const int fd, const struct bp35a1_handler * const handler,
         } else if ( n == 0 ) {
             return false;
         }
-        if ( strcmp( buffer, "SKVER" ) == 0 ) {
-            if ( parse_skver( fd, handler, userdata ) ) {
-                return true;
-            }
-        } else if ( strcmp( buffer, "EVER" ) == 0 ) {
-            if ( parse_ever( fd, handler, userdata ) ) {
-                return true;
-            }
-        } else if ( strcmp( buffer, "SKINFO" ) == 0 ) {
-            if ( parse_skinfo( fd, handler, userdata ) ) {
-                return true;
-            }
-        } else if ( strcmp( buffer, "EINFO" ) == 0 ) {
-            if ( parse_einfo( fd, handler, userdata ) ) {
-                return true;
+        static struct {
+            const char *name;
+            bool (*parse)( const int fd, const struct bp35a1_handler * const handler, void *userdata );
+        } commands[] = {
+            { "SKVER", parse_skver },
+            { "EVER", parse_ever },
+            { "SKINFO", parse_skinfo },
+            { "EINFO", parse_einfo }
+        };
+        static const size_t command_size = sizeof( commands ) / sizeof( commands[0] );
+        for ( size_t i = 0; i < command_size; i++ ) {
+            if ( strcmp( buffer, commands[i].name ) == 0 ) {
+                return commands[i].parse( fd, handler, userdata );
             }
         }
     }

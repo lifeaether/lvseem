@@ -21,6 +21,7 @@ static const char * const lvseem_command_name = "lvseem";
 struct lvseem_option {
     const char *command;
     const char *device_name;
+    bool clear;
     const char *b_id;
     const char *b_password;
     const char *channel;
@@ -45,6 +46,8 @@ bool lvseem_option_parse( const int argc, const char * const argv[], struct lvse
             option->pan_id = argv[i];
         } else if ( strcmp( argv[i], "--addr" ) == 0 && ++i < argc ) {
             option->addr = argv[i];
+        } else if ( strcmp( argv[i], "--clear" ) == 0 ) {
+            option->clear = true;
         } else {
             option->command = argv[i];
         }
@@ -112,7 +115,7 @@ bool serial_port_initalize( const int serial_port )
 
 void lvseem_usage( void )
 {
-    fprintf( stderr, "usage: %s command [options]\n", lvseem_command_name );
+    fprintf( stderr, "usage: %s command [--clear][options]\n", lvseem_command_name );
     fprintf( stderr, "\t%s version --device DeviceName\n", lvseem_command_name );
     fprintf( stderr, "\t%s info --device DeviceName\n", lvseem_command_name );
     fprintf( stderr, "\t%s help\n", lvseem_command_name );
@@ -160,6 +163,16 @@ int main(int argc, const char * argv[]) {
         close( serial_port );
         return EXIT_FAILURE;
     }
+
+    if ( option.clear ) {
+        uint8_t b = 0;
+        fprintf( stdout, "CLEAR: " );
+        while ( read( serial_port, &b, 1 ) == 1 ) {
+            fprintf( stdout, "%X", b );
+        }
+        fprintf( stdout, "\n" );
+    }
+
 
     if ( option.b_id ) {
 //        if ( ! bp35a1_set_b_id( serial_port, stdout, option.b_id ) ) {

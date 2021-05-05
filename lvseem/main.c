@@ -39,6 +39,12 @@ bool lvseem_option_parse( const int argc, const char * const argv[], struct lvse
             option->b_id = argv[i];
         } else if ( strcmp( argv[i], "--password" ) == 0 && ++i < argc ) {
             option->b_password = argv[i];
+        } else if ( strcmp( argv[i], "--channel" ) == 0 && ++i < argc ) {
+            option->channel = argv[i];
+        } else if ( strcmp( argv[i], "--pan_id" ) == 0 && ++i < argc ) {
+            option->pan_id = argv[i];
+        } else if ( strcmp( argv[i], "--addr" ) == 0 && ++i < argc ) {
+            option->addr = argv[i];
         } else {
             option->command = argv[i];
         }
@@ -51,6 +57,12 @@ bool lvseem_option_validate( const struct lvseem_option * const option ) {
         return false;
     }
     if ( ! option->command ) {
+        return false;
+    }
+    if ( strcmp( option->command, "help" ) == 0 ) {
+        return true;
+    }
+    if ( ! option->device_name ) {
         return false;
     }
     return true;
@@ -101,10 +113,14 @@ bool serial_port_initalize( const int serial_port )
 void lvseem_usage( void )
 {
     fprintf( stderr, "usage: %s command [options]\n", lvseem_command_name );
-    fprintf( stderr, "\t%s read --device DeviceName\n", lvseem_command_name );
     fprintf( stderr, "\t%s status --device DeviceName\n", lvseem_command_name );
-    fprintf( stderr, "\t%s activescan --device DeviceName [--id Route-B_ID] [--password Route-B_Password]\n", lvseem_command_name );
     fprintf( stderr, "\t%s help\n", lvseem_command_name );
+}
+
+static bool handler_event_ever( void *userdata, const char *version )
+{
+    fprintf( stdout, "%s\n", version );
+    return true;
 }
 
 int main(int argc, const char * argv[]) {
@@ -135,32 +151,34 @@ int main(int argc, const char * argv[]) {
     }
 
     if ( option.b_id ) {
-        if ( ! bp35a1_set_b_id( serial_port, stdout, option.b_id ) ) {
-            close( serial_port );
-            return EXIT_FAILURE;
-        }
+//        if ( ! bp35a1_set_b_id( serial_port, stdout, option.b_id ) ) {
+//            close( serial_port );
+//            return EXIT_FAILURE;
+//        }
     }
 
     if ( option.b_password ) {
-        if ( ! bp35a1_set_b_password( serial_port, stdout, option.b_password ) ) {
-            close( serial_port );
-            return EXIT_FAILURE;
+//        if ( ! bp35a1_set_b_password( serial_port, stdout, option.b_password ) ) {
+//            close( serial_port );
+//            return EXIT_FAILURE;
+//        }
+    }
+
+    bool result = EXIT_SUCCESS;
+    if ( strcmp( option.command, "status" ) == 0 ) {
+        if ( ! bp35a1_write( serial_port, "SKVER\r\n", sizeof("SKVER\r\n")-1 ) ) {
+            fprintf( stderr, "bp35a1_write: failed\n" );
+            result = EXIT_FAILURE;
         }
     }
 
-    if ( strcmp( option.command, "read" ) == 0 ) {
-        bp35a1_read_to_end( serial_port, stdout );
-    } else if ( strcmp( option.command, "status" ) == 0 ) {
-        bp35a1_status( serial_port, stdout );
-    } else if ( strcmp( option.command, "activescan" ) == 0 ) {
-        bp35a1_activescan( serial_port, stdout );
-    } else {
-        fprintf( stderr, "no command found\n" );
-    }
+    struct bp35a1_handler handler = {};
+    handler.event_ever = handler_event_ever;
+    while ( bp35a1_parse( serial_port, &handler, NULL ) );
 
     if ( close( serial_port ) != 0 ) {
-        return EXIT_FAILURE;
+        fprintf( stderr, "close: failed\n" );
     }
 
-    return EXIT_SUCCESS;
+    return result;
 }

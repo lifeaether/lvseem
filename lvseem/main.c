@@ -177,12 +177,12 @@ int main(int argc, const char * argv[]) {
 
     bool result = EXIT_SUCCESS;
     if ( strcmp( option.command, "version" ) == 0 ) {
-        if ( ! bp35a1_write( serial_port, "SKVER\r\n", sizeof("SKVER\r\n")-1 ) ) {
+        if ( ! bp35a1_command( serial_port, "SKVER\r\n" ) ) {
             fprintf( stderr, "bp35a1_write: failed\n" );
             result = EXIT_FAILURE;
         }
     } else if ( strcmp( option.command, "info" ) == 0 ) {
-        if ( ! bp35a1_write( serial_port, "SKINFO\r\n", sizeof("SKINFO\r\n")-1 ) ) {
+        if ( ! bp35a1_command( serial_port, "SKINFO\r\n" ) ) {
             fprintf( stderr, "bp35a1_write: failed\n" );
             result = EXIT_FAILURE;
         }
@@ -191,7 +191,7 @@ int main(int argc, const char * argv[]) {
     struct bp35a1_handler handler = {};
     handler.event_ever = handler_event_ever;
     handler.event_einfo = handler_event_einfo;
-    while ( bp35a1_parse( serial_port, &handler, NULL ) );
+    while ( bp35a1_response( serial_port, &handler, NULL ) );
 
     if ( close( serial_port ) != 0 ) {
         fprintf( stderr, "close: failed\n" );

@@ -10,6 +10,18 @@
 #include <unistd.h>
 #include <string.h>
 
+static bool bp35a1_write( const int fd, const void * const bytes, const size_t size )
+{
+    for ( size_t current_size = 0; current_size < size; ) {
+        const ssize_t n = write( fd, bytes, size - current_size );
+        if ( n == -1 ) {
+            return false;
+        }
+        current_size += n;
+    }
+    return true;
+}
+
 static bool read_bytes_to( const int fd, void * const read_bytes, size_t *read_size, const void * const to_bytes, const size_t to_size )
 {
     for ( size_t i = 0; i < *read_size; i++ ) {
@@ -23,18 +35,6 @@ static bool read_bytes_to( const int fd, void * const read_bytes, size_t *read_s
         }
     }
     return false;
-}
-
-static bool read_string_to( const int fd, char * const read_string, const size_t read_size, const void * const to_string )
-{
-    size_t size = read_size-1;
-    if ( ! read_bytes_to( fd, read_string, &size, to_string, strlen( to_string ) ) ) {
-        return false;
-    }
-    if ( size > 0 ) {
-        read_string[size] = '\0';
-    }
-    return true;
 }
 
 static bool read_bytes( const int fd, const void * const bytes, size_t size )
@@ -51,23 +51,32 @@ static bool read_bytes( const int fd, const void * const bytes, size_t size )
     return true;
 }
 
+static bool read_string_to( const int fd, char * const read_string, const size_t read_size, const void * const to_string )
+{
+    size_t size = read_size-1;
+    if ( ! read_bytes_to( fd, read_string, &size, to_string, strlen( to_string ) ) ) {
+        return false;
+    }
+    if ( size > 0 ) {
+        read_string[size] = '\0';
+    }
+    return true;
+}
+
 static bool read_string( const int fd, const char * const string )
 {
     return read_bytes( fd, string, strlen( string ) );
 }
 
-static const char bp35a1_end_of_line[] = "\r\n";
-static const char bp35a1_command_skver[] = "SKVER";
 static bool parse_skver( const int fd, const struct bp35a1_handler * const handler, void *userdata )
 {
     char string[64] = {};
-    if ( ! read_string_to( fd, string, sizeof( string ), bp35a1_end_of_line ) ) {
+    if ( ! read_string_to( fd, string, sizeof( string ), "\r\n" ) ) {
         return false;
     }
     return true;
 }
 
-static const char bp35a1_event_ever[] = "EVER";
 static bool parse_ever( const int fd, const struct bp35a1_handler * const handler, void *userdata )
 {
     if ( ! read_string( fd, " " ) ) {
@@ -75,7 +84,7 @@ static bool parse_ever( const int fd, const struct bp35a1_handler * const handle
     }
     {
         char string[64] = {};
-        if ( ! read_string_to( fd, string, sizeof( string ), bp35a1_end_of_line ) ) {
+        if ( ! read_string_to( fd, string, sizeof( string ), "\r\n" ) ) {
             return false;
         }
         if ( handler->event_ever ) {
@@ -87,17 +96,15 @@ static bool parse_ever( const int fd, const struct bp35a1_handler * const handle
     return true;
 }
 
-static const char bp35a1_command_skinfo[] = "SKINFO";
 static bool parse_skinfo( const int fd, const struct bp35a1_handler * const handler, void *userdata )
 {
     char string[64] = {};
-    if ( ! read_string_to( fd, string, sizeof( string ), bp35a1_end_of_line ) ) {
+    if ( ! read_string_to( fd, string, sizeof( string ), "\r\n" ) ) {
         return false;
     }
     return true;
 }
 
-static const char bp35a1_event_einfo[] = "EINFO";
 static bool parse_einfo( const int fd, const struct bp35a1_handler * const handler, void *userdata )
 {
     if ( ! read_string( fd, " " ) ) {
@@ -138,22 +145,14 @@ static bool parse_einfo( const int fd, const struct bp35a1_handler * const handl
     return true;
 }
 
-
-bool bp35a1_write( const int fd, const void * const bytes, const size_t size )
+bool bp35a1_command( const int fd, const char *string )
 {
-    for ( size_t current_size = 0; current_size < size; ) {
-        const ssize_t n = write( fd, bytes, size - current_size );
-        if ( n == -1 ) {
-            return false;
-        }
-        current_size += n;
-    }
-    return true;
+    return bp35a1_write( fd, string, strlen( string )-1 );
 }
 
-bool bp35a1_parse( const int fd, const struct bp35a1_handler * const handler, void *userdata )
+bool bp35a1_response( const int fd, const struct bp35a1_handler * const handler, void *userdata )
 {
-    char buffer[64] = {};
+    char buffer[8] = {};
     const size_t buffer_size = sizeof( buffer );
     for ( size_t i = 0; i < buffer_size; i++ ) {
         const ssize_t n = read( fd, buffer+i, 1 );
@@ -162,19 +161,19 @@ bool bp35a1_parse( const int fd, const struct bp35a1_handler * const handler, vo
         } else if ( n == 0 ) {
             return false;
         }
-        if ( strcmp( buffer, bp35a1_command_skver ) == 0 ) {
+        if ( strcmp( buffer, "SKVER" ) == 0 ) {
             if ( parse_skver( fd, handler, userdata ) ) {
                 return true;
             }
-        } else if ( strcmp( buffer, bp35a1_event_ever ) == 0 ) {
+        } else if ( strcmp( buffer, "EVER" ) == 0 ) {
             if ( parse_ever( fd, handler, userdata ) ) {
                 return true;
             }
-        } else if ( strcmp( buffer, bp35a1_command_skinfo ) == 0 ) {
+        } else if ( strcmp( buffer, "SKINFO" ) == 0 ) {
             if ( parse_skinfo( fd, handler, userdata ) ) {
                 return true;
             }
-        } else if ( strcmp( buffer, bp35a1_event_einfo ) == 0 ) {
+        } else if ( strcmp( buffer, "EINFO" ) == 0 ) {
             if ( parse_einfo( fd, handler, userdata ) ) {
                 return true;
             }

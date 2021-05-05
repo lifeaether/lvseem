@@ -11,13 +11,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-bool bp35a1_write( const int fd, const void * const bytes, const size_t size );
-
 struct bp35a1_handler {
     bool (*event_ever)( void * const userdata, const char * const version );
     bool (*event_einfo)( void * const userdata, const char * const ipaddr, const char * const addr64, const char * const channel, const char * const panid, const char * const addr16 );
 };
 
-bool bp35a1_parse( const int fd, const struct bp35a1_handler * const handler, void *userdata );
+bool bp35a1_command( const int fd, const char *string );
+bool bp35a1_response( const int fd, const struct bp35a1_handler * const handler, void *userdata );
 
 #endif /* bp35a1_h */

@@ -10,7 +10,7 @@
 #include <unistd.h>
 #include <string.h>
 
-static bool parse_read_to( const int fd, void * const read_bytes, size_t *read_size, const void * const to_bytes, const size_t to_size )
+static bool read_bytes_to( const int fd, void * const read_bytes, size_t *read_size, const void * const to_bytes, const size_t to_size )
 {
     for ( size_t i = 0; i < *read_size; i++ ) {
         if ( read( fd, read_bytes+i, 1 ) != 1 ) {
@@ -18,54 +18,126 @@ static bool parse_read_to( const int fd, void * const read_bytes, size_t *read_s
             return false;
         }
         if ( i >= to_size-1 && memcmp( read_bytes+i-to_size+1, to_bytes, to_size ) == 0 ) {
-            *read_size = i+1;
+            *read_size = i-to_size+1;
             return true;
         }
     }
     return false;
 }
 
-const char bp35a1_end_of_line[] = "\r\n";
-const size_t bp35a1_end_of_line_size = sizeof( bp35a1_end_of_line );
+static bool read_string_to( const int fd, char * const read_string, const size_t read_size, const void * const to_string )
+{
+    size_t size = read_size-1;
+    if ( ! read_bytes_to( fd, read_string, &size, to_string, strlen( to_string ) ) ) {
+        return false;
+    }
+    if ( size > 0 ) {
+        read_string[size] = '\0';
+    }
+    return true;
+}
 
-const char bp35a1_command_skver[] = "SKVER";
-const size_t bp35a1_command_skver_size = sizeof( bp35a1_command_skver );
+static bool read_bytes( const int fd, const void * const bytes, size_t size )
+{
+    for ( int i = 0; i < size; i++ ) {
+        uint8_t b = 0;
+        if ( read( fd, &b, 1 ) != 1 ) {
+            return false;
+        }
+        if ( b != ((const uint8_t * const)bytes)[i] ) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool read_string( const int fd, const char * const string )
+{
+    return read_bytes( fd, string, strlen( string ) );
+}
+
+static const char bp35a1_end_of_line[] = "\r\n";
+static const char bp35a1_command_skver[] = "SKVER";
 static bool parse_skver( const int fd, const struct bp35a1_handler * const handler, void *userdata )
 {
-    char bytes[64];
-    size_t byte_size = sizeof( bytes );
-    if ( ! parse_read_to( fd, bytes, &byte_size, bp35a1_end_of_line, bp35a1_end_of_line_size-1 ) ) {
+    char string[64] = {};
+    if ( ! read_string_to( fd, string, sizeof( string ), bp35a1_end_of_line ) ) {
         return false;
     }
     return true;
 }
 
-const char bp35a1_event_ever[] = "EVER";
-const size_t bp35a1_event_ever_size = sizeof( bp35a1_event_ever );
+static const char bp35a1_event_ever[] = "EVER";
 static bool parse_ever( const int fd, const struct bp35a1_handler * const handler, void *userdata )
 {
-    {
-        char bytes[1];
-        size_t byte_size = sizeof( bytes );
-        if ( ! parse_read_to( fd, bytes, &byte_size, " ", 1 ) ) {
-            return false;
-        }
+    if ( ! read_string( fd, " " ) ) {
+        return false;
     }
     {
-        char bytes[64];
-        size_t byte_size = sizeof( bytes );
-        if ( ! parse_read_to( fd, bytes, &byte_size, bp35a1_end_of_line, bp35a1_end_of_line_size-1 ) ) {
+        char string[64] = {};
+        if ( ! read_string_to( fd, string, sizeof( string ), bp35a1_end_of_line ) ) {
             return false;
         }
         if ( handler->event_ever ) {
-            bytes[byte_size-bp35a1_end_of_line_size+1] = '\0';
-            if ( ! handler->event_ever( userdata, bytes ) ) {
+            if ( ! handler->event_ever( userdata, string ) ) {
                 return false;
             }
         }
     }
     return true;
 }
+
+static const char bp35a1_command_skinfo[] = "SKINFO";
+static bool parse_skinfo( const int fd, const struct bp35a1_handler * const handler, void *userdata )
+{
+    char string[64] = {};
+    if ( ! read_string_to( fd, string, sizeof( string ), bp35a1_end_of_line ) ) {
+        return false;
+    }
+    return true;
+}
+
+static const char bp35a1_event_einfo[] = "EINFO";
+static bool parse_einfo( const int fd, const struct bp35a1_handler * const handler, void *userdata )
+{
+    if ( ! read_string( fd, " " ) ) {
+        return false;
+    }
+
+    char ipaddr[64] = {};
+    if ( ! read_string_to( fd, ipaddr, sizeof( ipaddr ), " " ) ) {
+        return false;
+    }
+
+    char addr64[32] = {};
+    if ( ! read_string_to( fd, addr64, sizeof( addr64 ), " " ) ) {
+        return false;
+    }
+
+    char channel[8] = {};
+    if ( ! read_string_to( fd, channel, sizeof( channel ), " " ) ) {
+        return false;
+    }
+
+    char panid[8] = {};
+    if ( ! read_string_to( fd, panid, sizeof( panid ), " " ) ) {
+        return false;
+    }
+
+    char addr16[8] = {};
+    if ( ! read_string_to( fd, addr16, sizeof( addr16 ), "\r\n" ) ) {
+        return false;
+    }
+
+    if ( handler->event_einfo ) {
+        if ( ! handler->event_einfo( userdata, ipaddr, addr64, channel, panid, addr16 ) ) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 
 bool bp35a1_write( const int fd, const void * const bytes, const size_t size )
 {
@@ -96,6 +168,14 @@ bool bp35a1_parse( const int fd, const struct bp35a1_handler * const handler, vo
             }
         } else if ( strcmp( buffer, bp35a1_event_ever ) == 0 ) {
             if ( parse_ever( fd, handler, userdata ) ) {
+                return true;
+            }
+        } else if ( strcmp( buffer, bp35a1_command_skinfo ) == 0 ) {
+            if ( parse_skinfo( fd, handler, userdata ) ) {
+                return true;
+            }
+        } else if ( strcmp( buffer, bp35a1_event_einfo ) == 0 ) {
+            if ( parse_einfo( fd, handler, userdata ) ) {
                 return true;
             }
         }

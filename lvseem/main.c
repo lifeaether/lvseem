@@ -113,13 +113,24 @@ bool serial_port_initalize( const int serial_port )
 void lvseem_usage( void )
 {
     fprintf( stderr, "usage: %s command [options]\n", lvseem_command_name );
-    fprintf( stderr, "\t%s status --device DeviceName\n", lvseem_command_name );
+    fprintf( stderr, "\t%s version --device DeviceName\n", lvseem_command_name );
+    fprintf( stderr, "\t%s info --device DeviceName\n", lvseem_command_name );
     fprintf( stderr, "\t%s help\n", lvseem_command_name );
 }
 
 static bool handler_event_ever( void *userdata, const char *version )
 {
     fprintf( stdout, "%s\n", version );
+    return true;
+}
+
+static bool handler_event_einfo( void * const userdata, const char * const ipaddr, const char * const addr64, const char * const channel, const char * const panid, const char * const addr16 )
+{
+    fprintf( stdout, "ipaddr: %s\n", ipaddr );
+    fprintf( stdout, "addr64: %s\n", addr64 );
+    fprintf( stdout, "channel: %s\n", channel );
+    fprintf( stdout, "panid: %s\n", panid );
+    fprintf( stdout, "addr16: %s\n", addr16 );
     return true;
 }
 
@@ -165,8 +176,13 @@ int main(int argc, const char * argv[]) {
     }
 
     bool result = EXIT_SUCCESS;
-    if ( strcmp( option.command, "status" ) == 0 ) {
+    if ( strcmp( option.command, "version" ) == 0 ) {
         if ( ! bp35a1_write( serial_port, "SKVER\r\n", sizeof("SKVER\r\n")-1 ) ) {
+            fprintf( stderr, "bp35a1_write: failed\n" );
+            result = EXIT_FAILURE;
+        }
+    } else if ( strcmp( option.command, "info" ) == 0 ) {
+        if ( ! bp35a1_write( serial_port, "SKINFO\r\n", sizeof("SKINFO\r\n")-1 ) ) {
             fprintf( stderr, "bp35a1_write: failed\n" );
             result = EXIT_FAILURE;
         }
@@ -174,6 +190,7 @@ int main(int argc, const char * argv[]) {
 
     struct bp35a1_handler handler = {};
     handler.event_ever = handler_event_ever;
+    handler.event_einfo = handler_event_einfo;
     while ( bp35a1_parse( serial_port, &handler, NULL ) );
 
     if ( close( serial_port ) != 0 ) {

@@ -13,6 +13,7 @@
 
 struct bp35a1_handler {
     bool (*unknown)( void * const userdata, const uint8_t * const bytes, size_t size );
+    bool (*response_ll64)( void * const userdata, const char * const ipaddress );
     bool (*event_ever)( void * const userdata, const char * const version );
     bool (*event_einfo)( void * const userdata, const char * const ipaddr, const char * const addr64, const char * const channel, const char * const panid, const char * const addr16 );
     bool (*event_1f)( void * const userdata, const char * const sender );

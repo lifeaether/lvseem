@@ -191,6 +191,39 @@ static bool parse_sksetrbid( const int fd, const struct bp35a1_handler * const h
     return true;
 }
 
+static bool parse_sksreg( const int fd, const struct bp35a1_handler * const handler, void *userdata )
+{
+    char string[128] = {};
+    if ( ! read_string_to( fd, string, sizeof( string ), "\r\n" ) ) {
+        return false;
+    }
+    if ( ! read_string( fd, "OK\r\n" ) ) {
+        return false;
+    }
+    return true;
+}
+
+static bool parse_skll64( const int fd, const struct bp35a1_handler * const handler, void *userdata )
+{
+    char string[128] = {};
+    if ( ! read_string_to( fd, string, sizeof( string ), "\r\n" ) ) {
+        return false;
+    }
+
+    if ( ! read_string_to( fd, string, sizeof( string ), "\r\n" ) ) {
+        return false;
+    }
+
+    if ( ! handler->response_ll64 ) {
+        return false;
+    }
+
+    if ( ! handler->response_ll64( userdata, string ) ) {
+        return false;
+    }
+
+    return true;
+}
 
 static bool parse_event_1f( const int fd, const struct bp35a1_handler * const handler, void *userdata )
 {
@@ -376,6 +409,8 @@ bool bp35a1_response( const int fd, const struct bp35a1_handler * const handler,
             { "SKSCAN", parse_skscan },
             { "SKSETPWD", parse_sksetpwd },
             { "SKSETRBID", parse_sksetrbid },
+            { "SKSREG", parse_sksreg },
+            { "SKLL64", parse_skll64 },
             { "EVENT 1F", parse_event_1f },
             { "EVENT 20", parse_event_20 },
             { "EVENT 22", parse_event_22 },

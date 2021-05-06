@@ -25,8 +25,9 @@ struct lvseem_option {
     const char *b_id;
     const char *b_password;
     const char *channel;
-    const char *pan_id;
+    const char *panid;
     const char *addr;
+    const char *ipaddr;
 };
 
 bool lvseem_option_parse( const int argc, const char * const argv[], struct lvseem_option * const option ) {
@@ -36,16 +37,18 @@ bool lvseem_option_parse( const int argc, const char * const argv[], struct lvse
     for ( int i = 1; i < argc; ++i ) {
         if ( strcmp( argv[i], "--device" ) == 0 && ++i < argc ) {
             option->device_name = argv[i];
-        } else if ( strcmp( argv[i], "--id" ) == 0 && ++i < argc ) {
+        } else if ( strcmp( argv[i], "--bid" ) == 0 && ++i < argc ) {
             option->b_id = argv[i];
-        } else if ( strcmp( argv[i], "--password" ) == 0 && ++i < argc ) {
+        } else if ( strcmp( argv[i], "--bpass" ) == 0 && ++i < argc ) {
             option->b_password = argv[i];
         } else if ( strcmp( argv[i], "--channel" ) == 0 && ++i < argc ) {
             option->channel = argv[i];
-        } else if ( strcmp( argv[i], "--pan_id" ) == 0 && ++i < argc ) {
-            option->pan_id = argv[i];
+        } else if ( strcmp( argv[i], "--panid" ) == 0 && ++i < argc ) {
+            option->panid = argv[i];
         } else if ( strcmp( argv[i], "--addr" ) == 0 && ++i < argc ) {
             option->addr = argv[i];
+        } else if ( strcmp( argv[i], "--ipaddr" ) == 0 && ++i < argc ) {
+            option->ipaddr = argv[i];
         } else if ( strcmp( argv[i], "--clear" ) == 0 ) {
             option->clear = true;
         } else {
@@ -120,19 +123,32 @@ void lvseem_usage( void )
     fprintf( stderr, "\t%s info --device DeviceName [--clear]\n", lvseem_command_name );
     fprintf( stderr, "\t%s scan --device DeviceName [--clear]\n", lvseem_command_name );
     fprintf( stderr, "\t%s activescan --device DeviceName [--clear]\n", lvseem_command_name );
+    fprintf( stderr, "\t%s ll64 --device DeviceName --addr Address [--clear]\n", lvseem_command_name );
+    fprintf( stderr, "\t%s join --device DeviceName --bid B-RouteID --bpass B-RoutePassword --channel channel --panid panid --ipaddr address [--clear]\n", lvseem_command_name );
     fprintf( stderr, "\t%s help\n", lvseem_command_name );
 }
 
 static bool handler_unknown( void * const userdata, const uint8_t * const bytes, size_t size )
 {
     if ( size > 0 ) {
-        fprintf( stdout, "UNKNOWN: " );
+        fprintf( stdout, "UNKNOWN BYTES: " );
         for ( size_t i = 0; i < size; i++ ) {
             fprintf( stdout, "%02X", bytes[i] );
         }
         fprintf( stdout, "\n" );
+        fprintf( stdout, "UNKNOWN CHARS: " );
+        for ( size_t i = 0; i < size; i++ ) {
+            fprintf( stdout, "%c", bytes[i] );
+        }
+        fprintf( stdout, "\n" );
     }
     return false;
+}
+
+static bool handler_response_ll64( void *userdata, const char * const ipaddress )
+{
+    fprintf( stdout, "IPADDRESS: %s\n", ipaddress );
+    return true;
 }
 
 static bool handler_event_ever( void *userdata, const char *version )
@@ -227,6 +243,7 @@ int main(int argc, const char * argv[]) {
 
     struct bp35a1_handler handler = {};
     handler.unknown = handler_unknown;
+    handler.response_ll64 = handler_response_ll64;
     handler.event_ever = handler_event_ever;
     handler.event_einfo = handler_event_einfo;
     handler.event_1f = handler_event_1f;
@@ -265,23 +282,25 @@ int main(int argc, const char * argv[]) {
         }
     }
 
-    bool result = EXIT_SUCCESS;
     if ( strcmp( option.command, "version" ) == 0 ) {
         if ( ! bp35a1_command( serial_port, "SKVER\r\n" ) ) {
             fprintf( stderr, "SKVER command: failed\n" );
-            result = EXIT_FAILURE;
+            close( serial_port );
+            return EXIT_FAILURE;
         }
         while ( bp35a1_response( serial_port, &handler, NULL ) );
     } else if ( strcmp( option.command, "info" ) == 0 ) {
         if ( ! bp35a1_command( serial_port, "SKINFO\r\n" ) ) {
             fprintf( stderr, "bp35a1_write: failed\n" );
-            result = EXIT_FAILURE;
+            close( serial_port );
+            return EXIT_FAILURE;
         }
         while ( bp35a1_response( serial_port, &handler, NULL ) );
     } else if ( strcmp( option.command, "scan" ) == 0 ) {
         if ( ! bp35a1_command( serial_port, "SKSCAN 0 FFFFFFFF 4\r\n" ) ) {
             fprintf( stderr, "bp35a1_write: failed\n" );
-            result = EXIT_FAILURE;
+            close( serial_port );
+            return EXIT_FAILURE;
         }
         bool completion = false;
         for ( int i = 0; i < 10; i++ ) {
@@ -294,7 +313,8 @@ int main(int argc, const char * argv[]) {
     } else if ( strcmp( option.command, "activescan" ) == 0 ) {
         if ( ! bp35a1_command( serial_port, "SKSCAN 2 FFFFFFFF 6\r\n" ) ) {
             fprintf( stderr, "bp35a1_write: failed\n" );
-            result = EXIT_FAILURE;
+            close( serial_port );
+            return EXIT_FAILURE;
         }
         bool completion = false;
         for ( int i = 0; i < 20; i++ ) {
@@ -304,11 +324,51 @@ int main(int argc, const char * argv[]) {
             }
             sleep( 1 );
         }
+    } else if ( strcmp( option.command, "ll64" ) == 0 ) {
+        char command[128] = {};
+        snprintf( command, sizeof(command), "SKLL64 %s\r\n", option.addr );
+        if ( ! bp35a1_command( serial_port, command ) ) {
+            fprintf( stderr, "SKLL64: command failed\n" );
+            close( serial_port );
+            return EXIT_FAILURE;
+        }
+        if ( ! bp35a1_response( serial_port, &handler, NULL ) ) {
+            fprintf( stderr, "SKLL64: response failed\n" );
+            close( serial_port );
+            return EXIT_FAILURE;
+        }
+    } else if ( strcmp( option.command, "join" ) == 0 ) {
+        char command[128] = {};
+        snprintf( command, sizeof(command), "SKSREG S2 %s\r\n", option.channel );
+        if ( ! bp35a1_command( serial_port, command ) ) {
+            fprintf( stderr, "SKSREG S2: command failed\n" );
+            close( serial_port );
+            return EXIT_FAILURE;
+        }
+        if ( ! bp35a1_response( serial_port, &handler, NULL ) ) {
+            fprintf( stderr, "SKSREG S2: response failed\n" );
+            close( serial_port );
+            return EXIT_FAILURE;
+        }
+        snprintf( command, sizeof(command), "SKSREG S3 %s\r\n", option.panid );
+        if ( ! bp35a1_command( serial_port, command ) ) {
+            fprintf( stderr, "SKSREG S3: command failed\n" );
+            close( serial_port );
+            return EXIT_FAILURE;
+        }
+        if ( ! bp35a1_response( serial_port, &handler, NULL ) ) {
+            fprintf( stderr, "SKSREG S3: response failed\n" );
+            close( serial_port );
+            return EXIT_FAILURE;
+        }
+    } else {
+        fprintf( stderr, "lvseem: '%s' command not found\n", option.command );
+        return EXIT_FAILURE;
     }
 
     if ( close( serial_port ) != 0 ) {
         fprintf( stderr, "close: failed\n" );
     }
 
-    return result;
+    return EXIT_SUCCESS;
 }

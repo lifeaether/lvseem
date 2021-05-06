@@ -87,11 +87,15 @@ static bool parse_ever( const int fd, const struct bp35a1_handler * const handle
         if ( ! read_string_to( fd, string, sizeof( string ), "\r\n" ) ) {
             return false;
         }
-        if ( handler->event_ever ) {
-            if ( ! handler->event_ever( userdata, string ) ) {
-                return false;
-            }
+        if ( ! handler->event_ever ) {
+            return false;
         }
+        if ( ! handler->event_ever( userdata, string ) ) {
+            return false;
+        }
+    }
+    if ( ! read_string( fd, "OK\r\n" ) ) {
+        return false;
     }
     return true;
 }
@@ -136,10 +140,16 @@ static bool parse_einfo( const int fd, const struct bp35a1_handler * const handl
         return false;
     }
 
-    if ( handler->event_einfo ) {
-        if ( ! handler->event_einfo( userdata, ipaddr, addr64, channel, panid, addr16 ) ) {
-            return false;
-        }
+    if ( ! handler->event_einfo ) {
+        return false;
+    }
+
+    if ( ! handler->event_einfo( userdata, ipaddr, addr64, channel, panid, addr16 ) ) {
+        return false;
+    }
+
+    if ( ! read_string( fd, "OK\r\n" ) ) {
+        return false;
     }
 
     return true;
@@ -253,10 +263,16 @@ static bool parse_eedscan( const int fd, const struct bp35a1_handler * const han
         return false;
     }
 
-    if ( handler->event_eedscan ) {
-        if ( ! handler->event_eedscan( userdata, string ) ) {
-            return false;
-        }
+    if ( ! handler->event_eedscan ) {
+        return false;
+    }
+
+    if ( ! handler->event_eedscan( userdata, string ) ) {
+        return false;
+    }
+
+    if ( ! read_string( fd, "\r\n" ) ) {
+        return false;
     }
 
     return true;
@@ -337,15 +353,17 @@ bool bp35a1_command( const int fd, const char * const string )
     return bp35a1_write( fd, string, strlen( string )-1 );
 }
 
-bool bp35a1_response( const int fd, char * const buffer, const size_t buffer_size, const struct bp35a1_handler * const handler, void *userdata )
+bool bp35a1_response( const int fd, const struct bp35a1_handler * const handler, void *userdata )
 {
-    memset( buffer, 0, buffer_size );
-    for ( size_t i = 0; i < buffer_size; i++ ) {
+    uint8_t buffer[16] = {};
+    const size_t buffer_size = sizeof( buffer );
+    size_t i = 0;
+    for ( ; i < buffer_size; i++ ) {
         const ssize_t n = read( fd, buffer+i, 1 );
         if ( n == -1 ) {
             return false;
         } else if ( n == 0 ) {
-            return false;
+            break;
         }
         static struct {
             const char *name;
@@ -365,11 +383,14 @@ bool bp35a1_response( const int fd, char * const buffer, const size_t buffer_siz
             { "EPANDESC", parse_epandesc },
         };
         static const size_t command_size = sizeof( commands ) / sizeof( commands[0] );
-        for ( size_t i = 0; i < command_size; i++ ) {
-            if ( strcmp( buffer, commands[i].name ) == 0 ) {
-                return commands[i].parse( fd, handler, userdata );
+        for ( size_t j = 0; j < command_size; j++ ) {
+            if ( strcmp( (const char *)buffer, commands[j].name ) == 0 ) {
+                return commands[j].parse( fd, handler, userdata );
             }
         }
     }
-    return false;
+    if ( ! handler->unknown ) {
+        return false;
+    }
+    return handler->unknown( userdata, buffer, i );
 }

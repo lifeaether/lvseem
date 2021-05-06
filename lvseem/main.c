@@ -123,6 +123,18 @@ void lvseem_usage( void )
     fprintf( stderr, "\t%s help\n", lvseem_command_name );
 }
 
+static bool handler_unknown( void * const userdata, const uint8_t * const bytes, size_t size )
+{
+    if ( size > 0 ) {
+        fprintf( stdout, "UNKNOWN: " );
+        for ( size_t i = 0; i < size; i++ ) {
+            fprintf( stdout, "%02X", bytes[i] );
+        }
+        fprintf( stdout, "\n" );
+    }
+    return false;
+}
+
 static bool handler_event_ever( void *userdata, const char *version )
 {
     fprintf( stdout, "%s\n", version );
@@ -208,15 +220,13 @@ int main(int argc, const char * argv[]) {
         uint8_t b = 0;
         fprintf( stdout, "CLEAR: " );
         while ( read( serial_port, &b, 1 ) == 1 ) {
-            fprintf( stdout, "%X", b );
+            fprintf( stdout, "%02X", b );
         }
         fprintf( stdout, "\n" );
     }
 
-    char buffer[12] = {};
-    const size_t buffer_size = sizeof( buffer )-1;
-
     struct bp35a1_handler handler = {};
+    handler.unknown = handler_unknown;
     handler.event_ever = handler_event_ever;
     handler.event_einfo = handler_event_einfo;
     handler.event_1f = handler_event_1f;
@@ -233,7 +243,7 @@ int main(int argc, const char * argv[]) {
             close( serial_port );
             return EXIT_FAILURE;
         }
-        if ( ! bp35a1_response( serial_port, buffer, buffer_size, &handler, NULL ) ) {
+        if ( ! bp35a1_response( serial_port, &handler, NULL ) ) {
             fprintf( stderr, "SKSETRBID: response failed\n" );
             close( serial_port );
             return EXIT_FAILURE;
@@ -248,7 +258,7 @@ int main(int argc, const char * argv[]) {
             close( serial_port );
             return EXIT_FAILURE;
         }
-        if ( ! bp35a1_response( serial_port, buffer, buffer_size, &handler, NULL ) ) {
+        if ( ! bp35a1_response( serial_port, &handler, NULL ) ) {
             fprintf( stderr, "SKSETPWD: response failed\n" );
             close( serial_port );
             return EXIT_FAILURE;
@@ -258,16 +268,16 @@ int main(int argc, const char * argv[]) {
     bool result = EXIT_SUCCESS;
     if ( strcmp( option.command, "version" ) == 0 ) {
         if ( ! bp35a1_command( serial_port, "SKVER\r\n" ) ) {
-            fprintf( stderr, "bp35a1_write: failed\n" );
+            fprintf( stderr, "SKVER command: failed\n" );
             result = EXIT_FAILURE;
         }
-        while ( bp35a1_response( serial_port, buffer, buffer_size, &handler, NULL ) );
+        while ( bp35a1_response( serial_port, &handler, NULL ) );
     } else if ( strcmp( option.command, "info" ) == 0 ) {
         if ( ! bp35a1_command( serial_port, "SKINFO\r\n" ) ) {
             fprintf( stderr, "bp35a1_write: failed\n" );
             result = EXIT_FAILURE;
         }
-        while ( bp35a1_response( serial_port, buffer, buffer_size, &handler, NULL ) );
+        while ( bp35a1_response( serial_port, &handler, NULL ) );
     } else if ( strcmp( option.command, "scan" ) == 0 ) {
         if ( ! bp35a1_command( serial_port, "SKSCAN 0 FFFFFFFF 4\r\n" ) ) {
             fprintf( stderr, "bp35a1_write: failed\n" );
@@ -275,7 +285,7 @@ int main(int argc, const char * argv[]) {
         }
         bool completion = false;
         for ( int i = 0; i < 10; i++ ) {
-            while ( bp35a1_response( serial_port, buffer, buffer_size, &handler, &completion ) );
+            while ( bp35a1_response( serial_port, &handler, &completion ) );
             if ( completion ) {
                 break;
             }
@@ -288,7 +298,7 @@ int main(int argc, const char * argv[]) {
         }
         bool completion = false;
         for ( int i = 0; i < 20; i++ ) {
-            while ( bp35a1_response( serial_port, buffer, buffer_size, &handler, &completion ) );
+            while ( bp35a1_response( serial_port, &handler, &completion ) );
             if ( completion ) {
                 break;
             }

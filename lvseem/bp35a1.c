@@ -157,6 +157,31 @@ static bool parse_skscan( const int fd, const struct bp35a1_handler * const hand
     return true;
 }
 
+static bool parse_sksetpwd( const int fd, const struct bp35a1_handler * const handler, void *userdata )
+{
+    char string[128] = {};
+    if ( ! read_string_to( fd, string, sizeof( string ), "\r\n" ) ) {
+        return false;
+    }
+    if ( ! read_string( fd, "OK\r\n" ) ) {
+        return false;
+    }
+    return true;
+}
+
+static bool parse_sksetrbid( const int fd, const struct bp35a1_handler * const handler, void *userdata )
+{
+    char string[128] = {};
+    if ( ! read_string_to( fd, string, sizeof( string ), "\r\n" ) ) {
+        return false;
+    }
+    if ( ! read_string( fd, "OK\r\n" ) ) {
+        return false;
+    }
+    return true;
+}
+
+
 static bool parse_event_1f( const int fd, const struct bp35a1_handler * const handler, void *userdata )
 {
     if ( ! read_string( fd, " " ) ) {
@@ -170,6 +195,46 @@ static bool parse_event_1f( const int fd, const struct bp35a1_handler * const ha
 
     if ( handler->event_1f ) {
         if ( ! handler->event_1f( userdata, sender ) ) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static bool parse_event_20( const int fd, const struct bp35a1_handler * const handler, void *userdata )
+{
+    if ( ! read_string( fd, " " ) ) {
+        return false;
+    }
+
+    char string[128] = {};
+    if ( ! read_string_to( fd, string, sizeof( string ), "\r\n" ) ) {
+        return false;
+    }
+
+    if ( handler->event_20 ) {
+        if ( ! handler->event_20( userdata, string ) ) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static bool parse_event_22( const int fd, const struct bp35a1_handler * const handler, void *userdata )
+{
+    if ( ! read_string( fd, " " ) ) {
+        return false;
+    }
+
+    char sender[128] = {};
+    if ( ! read_string_to( fd, sender, sizeof( sender ), "\r\n" ) ) {
+        return false;
+    }
+
+    if ( handler->event_22 ) {
+        if ( ! handler->event_22( userdata, sender ) ) {
             return false;
         }
     }
@@ -197,15 +262,84 @@ static bool parse_eedscan( const int fd, const struct bp35a1_handler * const han
     return true;
 }
 
-bool bp35a1_command( const int fd, const char *string )
+static bool parse_epandesc( const int fd, const struct bp35a1_handler * const handler, void *userdata )
+{
+    if ( ! read_string( fd, "\r\n" ) ) {
+        return false;
+    }
+
+    char buffer[256] = {};
+    if ( ! read_string_to( fd, buffer, sizeof( buffer ), "Channel:" ) ) {
+        return false;
+    }
+
+    char channel[8] = {};
+    if ( ! read_string_to( fd, channel, sizeof( channel ), "\r\n" ) ) {
+        return false;
+    }
+
+    if ( ! read_string_to( fd, buffer, sizeof( buffer ), "Channel Page:" ) ) {
+        return false;
+    }
+
+    char channel_page[8] = {};
+    if ( ! read_string_to( fd, channel_page, sizeof( channel_page ), "\r\n" ) ) {
+        return false;
+    }
+
+    if ( ! read_string_to( fd, buffer, sizeof( buffer ), "Pan ID:" ) ) {
+        return false;
+    }
+
+    char panid[8] = {};
+    if ( ! read_string_to( fd, panid, sizeof( panid ), "\r\n" ) ) {
+        return false;
+    }
+
+    if ( ! read_string_to( fd, buffer, sizeof( buffer ), "Addr:" ) ) {
+        return false;
+    }
+
+    char addr[32] = {};
+    if ( ! read_string_to( fd, addr, sizeof( addr ), "\r\n" ) ) {
+        return false;
+    }
+
+    if ( ! read_string_to( fd, buffer, sizeof( buffer ), "LQI:" ) ) {
+        return false;
+    }
+
+    char lqi[8] = {};
+    if ( ! read_string_to( fd, lqi, sizeof( lqi ), "\r\n" ) ) {
+        return false;
+    }
+
+    if ( ! read_string_to( fd, buffer, sizeof( buffer ), "PairID:" ) ) {
+        return false;
+    }
+
+    char pairid[16] = {};
+    if ( ! read_string_to( fd, pairid, sizeof( pairid ), "\r\n" ) ) {
+        return false;
+    }
+
+    if ( handler->event_epandesc ) {
+        if ( ! handler->event_epandesc( userdata, channel, channel_page, panid, addr, lqi, pairid ) ) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool bp35a1_command( const int fd, const char * const string )
 {
     return bp35a1_write( fd, string, strlen( string )-1 );
 }
 
-bool bp35a1_response( const int fd, const struct bp35a1_handler * const handler, void *userdata )
+bool bp35a1_response( const int fd, char * const buffer, const size_t buffer_size, const struct bp35a1_handler * const handler, void *userdata )
 {
-    char buffer[12] = {};
-    const size_t buffer_size = sizeof( buffer );
+    memset( buffer, 0, buffer_size );
     for ( size_t i = 0; i < buffer_size; i++ ) {
         const ssize_t n = read( fd, buffer+i, 1 );
         if ( n == -1 ) {
@@ -222,8 +356,13 @@ bool bp35a1_response( const int fd, const struct bp35a1_handler * const handler,
             { "SKINFO", parse_skinfo },
             { "EINFO", parse_einfo },
             { "SKSCAN", parse_skscan },
+            { "SKSETPWD", parse_sksetpwd },
+            { "SKSETRBID", parse_sksetrbid },
             { "EVENT 1F", parse_event_1f },
+            { "EVENT 20", parse_event_20 },
+            { "EVENT 22", parse_event_22 },
             { "EEDSCAN", parse_eedscan },
+            { "EPANDESC", parse_epandesc },
         };
         static const size_t command_size = sizeof( commands ) / sizeof( commands[0] );
         for ( size_t i = 0; i < command_size; i++ ) {

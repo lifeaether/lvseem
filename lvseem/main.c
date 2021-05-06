@@ -131,18 +131,18 @@ void lvseem_usage( void )
 static bool handler_unknown( void * const userdata, const uint8_t * const bytes, size_t size )
 {
     if ( size > 0 ) {
-        fprintf( stdout, "UNKNOWN BYTES: " );
-        for ( size_t i = 0; i < size; i++ ) {
-            fprintf( stdout, "%02X", bytes[i] );
-        }
-        fprintf( stdout, "\n" );
-        fprintf( stdout, "UNKNOWN CHARS: " );
+//        fprintf( stdout, "UNKNOWN BYTES: " );
+//        for ( size_t i = 0; i < size; i++ ) {
+//            fprintf( stdout, "%02X ", bytes[i] );
+//        }
+//        fprintf( stdout, "\n" );
+//        fprintf( stdout, "UNKNOWN CHARS: " );
         for ( size_t i = 0; i < size; i++ ) {
             fprintf( stdout, "%c", bytes[i] );
         }
-        fprintf( stdout, "\n" );
+//        fprintf( stdout, "\n" );
     }
-    return false;
+    return size > 0;
 }
 
 static bool handler_response_ll64( void *userdata, const char * const ipaddress )
@@ -179,12 +179,25 @@ static bool handler_event_20( void * const userdata, const char * const string )
     return true;
 }
 
+static bool handler_event_21( void * const userdata, const char * const sender, const char * const side )
+{
+    fprintf( stdout, "EVENT 21: %s %s\n", sender, side );
+    return true;
+}
+
 static bool handler_event_22( void * const userdata, const char * const string )
 {
     fprintf( stdout, "EVENT 22: %s\n", string );
     (*(bool *)userdata) = true;
     return true;
 }
+
+static bool handler_event_25( void * const userdata, const char * const sender )
+{
+    fprintf( stdout, "EVENT 25: %s\n", sender );
+    return true;
+}
+
 
 static bool handler_event_eedscan( void * const userdata, const char * const channel_rssi )
 {
@@ -203,6 +216,19 @@ bool handler_event_epandesc( void * const userdata, const char * const channel, 
     fprintf( stdout, "lqi: %s\n", lqi );
     fprintf( stdout, "pairid: %s\n", pairid );
    return true;
+}
+
+bool handler_event_erxudp( void * const userdata, const char * const sender, const char * const receiver, const char * const sender_port, const char * const receiver_port, const char * const sender_addr, const bool secured, const size_t size, const uint8_t * const bytes )
+{
+    fprintf( stdout, "ERXUDP:\n" );
+    fprintf( stdout, "sender: %s %s %s\n", sender, sender_port, sender_addr );
+    fprintf( stdout, "receiver: %s %s\n", receiver, receiver_port );
+    fprintf( stdout, "secured: %d\n", secured );
+    for ( size_t i = 0; i < size; i++ ) {
+        fprintf( stdout, "%02X ", bytes[i] );
+    }
+    fprintf( stdout, "\n" );
+    return true;
 }
 
 int main(int argc, const char * argv[]) {
@@ -236,7 +262,7 @@ int main(int argc, const char * argv[]) {
         uint8_t b = 0;
         fprintf( stdout, "CLEAR: " );
         while ( read( serial_port, &b, 1 ) == 1 ) {
-            fprintf( stdout, "%02X", b );
+            fprintf( stdout, "%02X ", b );
         }
         fprintf( stdout, "\n" );
     }
@@ -248,9 +274,12 @@ int main(int argc, const char * argv[]) {
     handler.event_einfo = handler_event_einfo;
     handler.event_1f = handler_event_1f;
     handler.event_20 = handler_event_20;
+    handler.event_21 = handler_event_21;
     handler.event_22 = handler_event_22;
+    handler.event_25 = handler_event_25;
     handler.event_eedscan = handler_event_eedscan;
     handler.event_epandesc = handler_event_epandesc;
+    handler.event_erxudp = handler_event_erxudp;
 
     if ( option.b_id ) {
         char command[128] = {};
@@ -360,6 +389,20 @@ int main(int argc, const char * argv[]) {
             fprintf( stderr, "SKSREG S3: response failed\n" );
             close( serial_port );
             return EXIT_FAILURE;
+        }
+        snprintf( command, sizeof(command), "SKJOIN %s\r\n", option.ipaddr );
+        if ( ! bp35a1_command( serial_port, command ) ) {
+            fprintf( stderr, "SKSREG S3: command failed\n" );
+            close( serial_port );
+            return EXIT_FAILURE;
+        }
+        bool completion = false;
+        for ( int i = 0; i < 20; i++ ) {
+            while ( bp35a1_response( serial_port, &handler, &completion ) );
+            if ( completion ) {
+                break;
+            }
+            sleep( 1 );
         }
     } else {
         fprintf( stderr, "lvseem: '%s' command not found\n", option.command );
